@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
-import { getJson } from '../api/client.js';
 
 type Props = {
   title: string;
   description: string;
-  endpoint: string;
+  load: () => Promise<Record<string, unknown>>;
   dataKey: string;
   emptyMessage: string;
 };
@@ -22,13 +21,13 @@ function formatValue(value: unknown): string {
   return value == null ? '' : String(value);
 }
 
-export function CapabilityCard({ title, description, endpoint, dataKey, emptyMessage }: Props) {
+export function CapabilityCard({ title, description, load, dataKey, emptyMessage }: Props) {
   const [state, setState] = useState<RequestState>({ status: 'loading' });
 
   useEffect(() => {
     let active = true;
 
-    getJson<Record<string, unknown>>(endpoint)
+    load()
       .then((payload) => {
         const items = payload[dataKey];
         if (!Array.isArray(items)) throw new Error(`Invalid ${dataKey} response`);
@@ -43,7 +42,7 @@ export function CapabilityCard({ title, description, endpoint, dataKey, emptyMes
     return () => {
       active = false;
     };
-  }, [dataKey, endpoint]);
+  }, [dataKey, load]);
 
   return (
     <section className="card h-100">
