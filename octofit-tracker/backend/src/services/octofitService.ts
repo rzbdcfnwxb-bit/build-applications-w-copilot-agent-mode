@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 import { Activity, Team, User, Workout } from '../models/index.js';
 
+function objectIdString(value: unknown): string {
+  if (typeof value === 'string') return value;
+  return value instanceof mongoose.Types.ObjectId ? value.toHexString() : '';
+}
+
 export async function listActivities() {
   return Activity.find().lean();
 }
@@ -13,8 +18,8 @@ export async function createActivity(input: unknown) {
   }
 
   const payload = input as Record<string, unknown>;
-  const userId = typeof payload.userId === 'string' ? payload.userId : payload.user;
-  const teamId = typeof payload.teamId === 'string' ? payload.teamId : payload.team;
+  const userId = objectIdString(typeof payload.userId === 'string' ? payload.userId : payload.user);
+  const teamId = objectIdString(typeof payload.teamId === 'string' ? payload.teamId : payload.team);
   const type = typeof payload.type === 'string' ? payload.type.trim() : '';
   const minutesValue = payload.minutes;
   const minutes = typeof minutesValue === 'number' ? minutesValue : Number(minutesValue);
