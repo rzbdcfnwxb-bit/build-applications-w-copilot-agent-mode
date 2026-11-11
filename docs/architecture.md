@@ -28,22 +28,24 @@ OctoFit Tracker is a three-tier application for a school fitness program. The st
 
 ## Implementation decisions
 
-Record your plan here before editing code.
+These decisions keep the service aligned to the three-tier architecture and the contract in this repository.
 
-- Presentation tier decision:
-- Logic tier decision:
-- Data tier decision:
-- Activity tracking approach:
-- Team management approach:
-- Leaderboard approach:
-- Workout suggestions approach:
+- Presentation tier decision: Build the UI as a React 19 single-page app using Vite, React Router, and Bootstrap. The browser should interact only through the shared API client in `octofit-tracker/frontend/src/api/client.ts`, with page-level components responsible for rendering loading, empty, success, and error states without embedding business logic in the UI.
+- Logic tier decision: Keep route handlers thin and delegate all behavior to explicit Express services. Validation and error handling stay in the API layer so routes return deliberate 4xx errors for invalid IDs, missing fields, or unmatched resources instead of leaking raw Mongo/Mongoose cast exceptions.
+- Data tier decision: Use MongoDB with Mongoose models for users, teams, activities, and seed data. Fixtures are managed with stable upserts so the demo environment remains reproducible while preserving any prior user data; schema validation handles required fields and reference integrity, while services compute derived values such as leaderboard totals and activity points.
+- Activity tracking approach: Store each activity as a persisted record with `user`, `team`, `type`, `minutes`, computed `points`, and `occurredAt`. A POST request validates both referenced IDs and records a single deliberate 4xx when either ID is invalid, then creates the activity with normalized fields that match the API contract.
+- Team management approach: Teams are created and listed with a required `name` and optional `mascot`, and team membership is tracked via the associated user/team references. Team creation rejects missing names with `400`, while list and create endpoints keep the submitted values exactly as they are provided to the database.
+- Leaderboard approach: Aggregate activity points by team, sum the points for each team, sort the totals descending, and assign a 1-based rank to each result. This keeps the leaderboard resilient to new activity rows while ensuring the contract remains consistent for UI display and API consumers.
+- Workout suggestions approach: Match a user by email from the seeded dataset, inspect their recent activity pattern or goal, and recommend a workout whose `focus` aligns with that pattern. When no user matches the email, the API returns a deliberate 4xx (for example `404`) so the frontend can show a clear not-found state.
 
 ## Test plan
 
-Record the commands you run and what each failure means.
+Use the following commands as the contract-level validation loop. Failure signals are intentionally specific so they point to the layer that regressed.
 
-- Data-tier command: `npm run test:data --prefix octofit-tracker/backend`
-- API command: `npm run test:api --prefix octofit-tracker/backend`
-- Frontend command: `npm test --prefix octofit-tracker/frontend`
-- Backend build command: `npm run build --prefix octofit-tracker/backend`
-- Frontend build command: `npm run build --prefix octofit-tracker/frontend`
+- Data-tier command: `npm run test:data --prefix octofit-tracker/backend` — validates seed data, Mongoose schema behavior, and data integrity rules. A failure here usually means the demo records or model validation are wrong, or the team/user relationship setup is inconsistent.
+- API command: `npm run test:api --prefix octofit-tracker/backend` — verifies the public `/api/*` contract, including 4xx handling, team validation, leaderboard sorting, and workout suggestion logic. A failure here points to route/service behavior rather than a frontend or build issue.
+- Frontend command: `npm test --prefix octofit-tracker/frontend` — checks component rendering and user interactions in the Vite React app. A failure usually indicates a UI contract problem, broken state handling, or a mismatch between the frontend and the API response shape.
+- Backend build command: `npm run build --prefix octofit-tracker/backend` — catches TypeScript and Express integration issues across the server implementation. A failure indicates a compile-time or type-safety regression in the backend, even if runtime tests are passing.
+- Frontend build command: `npm run build --prefix octofit-tracker/frontend` — ensures the React app bundles correctly in production mode. A failure usually signals mismatched imports, missing types, or invalid production configuration in the frontend layer.
+
+The expected delivery flow is: pass the data contract tests, then the API tests, then the frontend tests, and finally both build commands. Any failure should be corrected in the corresponding tier before moving on to the next layer.
